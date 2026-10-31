@@ -1,0 +1,31 @@
+name: Don Report ASH compile-only
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  verify-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Fetch pinned KoLmafia for compile-only test
+        run: |
+          curl -L --fail --silent --show-error -o KoLmafia-29334.jar \
+            https://github.com/kolmafia/kolmafia/releases/download/r29334/KoLmafia-29334.jar
+      - name: Verify read-only ASH without KoL login or gameplay
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.kolmafia/scripts"
+          cp scripts/don_accountval_report.ash "$HOME/.kolmafia/scripts/"
+          cat > "$HOME/.kolmafia/scripts/__verify_don_report.txt" <<'EOF'
+          verify don_accountval_report.ash
+          exit
+          EOF
+          cd "$HOME/.kolmafia"
+          timeout 90s java -jar "$GITHUB_WORKSPACE/KoLmafia-29334.jar" --CLI __verify_don_report.txt > "$GITHUB_WORKSPACE/verify.log" 2>&1 || true
+          cat "$GITHUB_WORKSPACE/verify.log"
+          test "$(grep -Fc 'Script verification complete.' "$GITHUB_WORKSPACE/verify.log" || true)" -eq 1
